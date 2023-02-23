@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/alexedwards/scs/v2"
-	"github.com/yogipratama/booking-rooms/pkg/config"
-	"github.com/yogipratama/booking-rooms/pkg/handlers"
-	"github.com/yogipratama/booking-rooms/pkg/render"
+	"github.com/yogipratama/booking-rooms/internal/config"
+	"github.com/yogipratama/booking-rooms/internal/handlers"
+	"github.com/yogipratama/booking-rooms/internal/render"
 )
 
 const port = ":8080"
