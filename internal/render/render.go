@@ -2,6 +2,8 @@ package render
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -13,6 +15,9 @@ import (
 )
 
 var appConfig *config.AppConfig
+
+var pathToTemplates = "./templates"
+var functions = template.FuncMap{}
 
 // sets the config for the template package
 func NewTemplates(app *config.AppConfig) {
@@ -27,7 +32,7 @@ func AddDefaultData(tmplData *models.TemplateData, request *http.Request) *model
 	return tmplData
 }
 
-func RenderTmpl(writer http.ResponseWriter, request *http.Request, tmpl string, tmplData *models.TemplateData) {
+func RenderTmpl(writer http.ResponseWriter, request *http.Request, tmpl string, tmplData *models.TemplateData) error {
 
 	var tmplCache map[string]*template.Template
 	if appConfig.UseCache {
@@ -40,7 +45,7 @@ func RenderTmpl(writer http.ResponseWriter, request *http.Request, tmpl string, 
 	// get requested template from cache
 	template, ok := tmplCache[tmpl]
 	if !ok {
-		log.Fatal("Could not get template from template cache")
+		return errors.New("can't get template from cache")
 	}
 
 	buf := new(bytes.Buffer)
@@ -55,15 +60,18 @@ func RenderTmpl(writer http.ResponseWriter, request *http.Request, tmpl string, 
 	// render the template
 	_, err = buf.WriteTo(writer)
 	if err != nil {
-		log.Println(err)
+		fmt.Println("Error writing template to browser", err)
+		return err
 	}
+
+	return nil
 }
 
 func CreateTmplCache() (map[string]*template.Template, error) {
 	tmplCache := map[string]*template.Template{}
 
 	// get all of the files named *.gohtml from ./templates
-	files, err := filepath.Glob("./templates/*.gohtml")
+	files, err := filepath.Glob(fmt.Sprintf("%s/*.gohtml", pathToTemplates))
 	if err != nil {
 		return tmplCache, err
 	}
@@ -71,18 +79,18 @@ func CreateTmplCache() (map[string]*template.Template, error) {
 	// range through all files ending with *.gohtml
 	for _, page := range files {
 		name := filepath.Base(page)
-		tmplSet, err := template.New(name).ParseFiles(page)
+		tmplSet, err := template.New(name).Funcs(functions).ParseFiles(page)
 		if err != nil {
 			return tmplCache, err
 		}
 
-		matches, err := filepath.Glob("./templates/*.layout.gohtml")
+		matches, err := filepath.Glob(fmt.Sprintf("%s/*.layout.gohtml", pathToTemplates))
 		if err != nil {
 			return tmplCache, err
 		}
 
 		if len(matches) > 0 {
-			tmplSet, err = tmplSet.ParseGlob("./templates/*.layout.gohtml")
+			tmplSet, err = tmplSet.ParseGlob(fmt.Sprintf("%s/*.layout.gohtml", pathToTemplates))
 			if err != nil {
 				return tmplCache, err
 			}
