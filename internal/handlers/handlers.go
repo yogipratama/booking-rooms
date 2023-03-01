@@ -3,11 +3,11 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 
 	"github.com/yogipratama/booking-rooms/internal/config"
 	"github.com/yogipratama/booking-rooms/internal/forms"
+	"github.com/yogipratama/booking-rooms/internal/helpers"
 	"github.com/yogipratama/booking-rooms/internal/models"
 	"github.com/yogipratama/booking-rooms/internal/render"
 )
@@ -33,22 +33,11 @@ func NewHandlers(repo *Repository) {
 }
 
 func (repo *Repository) Home(writer http.ResponseWriter, request *http.Request) {
-	remoteIP := request.RemoteAddr
-	repo.App.Session.Put(request.Context(), "remote_ip", remoteIP)
-
 	render.RenderTmpl(writer, request, "home.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) About(writer http.ResponseWriter, request *http.Request) {
-	stringMap := make(map[string]string)
-	stringMap["test"] = "Hello, im here!"
-
-	remoteIP := repo.App.Session.GetString(request.Context(), "remote_ip")
-	stringMap["remote_ip"] = remoteIP
-
-	render.RenderTmpl(writer, request, "about.page.gohtml", &models.TemplateData{
-		StringMap: stringMap,
-	})
+	render.RenderTmpl(writer, request, "about.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) Generals(writer http.ResponseWriter, request *http.Request) {
@@ -69,26 +58,6 @@ func (repo *Repository) PostAvailability(writer http.ResponseWriter, request *ht
 	writer.Write([]byte(fmt.Sprintf("Start date is %s and end date is %s", start, end)))
 }
 
-type jsonResponse struct {
-	OK      bool   `json:"ok"`
-	Message string `json:"message"`
-}
-
-func (repo *Repository) AvailabilityJSON(writer http.ResponseWriter, request *http.Request) {
-	resp := jsonResponse{
-		OK:      true,
-		Message: "Available!",
-	}
-
-	result, err := json.MarshalIndent(resp, "", "      ")
-	if err != nil {
-		log.Println(err)
-	}
-
-	writer.Header().Set("Content-Type", "application/json")
-	writer.Write(result)
-}
-
 func (repo *Repository) Contact(writer http.ResponseWriter, request *http.Request) {
 	render.RenderTmpl(writer, request, "contact.page.gohtml", &models.TemplateData{})
 }
@@ -106,8 +75,7 @@ func (repo *Repository) Reservation(writer http.ResponseWriter, request *http.Re
 func (repo *Repository) PostReservation(writer http.ResponseWriter, request *http.Request) {
 	err := request.ParseForm()
 	if err != nil {
-		log.Println(err)
-		return
+		helpers.ServerError(writer, err)
 	}
 
 	reservation := models.Reservation{
@@ -139,10 +107,31 @@ func (repo *Repository) PostReservation(writer http.ResponseWriter, request *htt
 	http.Redirect(writer, request, "/reservation-summary", http.StatusSeeOther)
 }
 
+type jsonResponse struct {
+	OK      bool   `json:"ok"`
+	Message string `json:"message"`
+}
+
+func (repo *Repository) AvailabilityJSON(writer http.ResponseWriter, request *http.Request) {
+	resp := jsonResponse{
+		OK:      true,
+		Message: "Available!",
+	}
+
+	result, err := json.MarshalIndent(resp, "", "      ")
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Write(result)
+}
+
 func (repo *Repository) ReservationSummary(writer http.ResponseWriter, request *http.Request) {
 	reservation, ok := repo.App.Session.Get(request.Context(), "reservation").(models.Reservation)
 	if !ok {
-		log.Println("cannot get item from session")
+		repo.App.ErrorLog.Println("Can't get error from session")
 		repo.App.Session.Put(request.Context(), "error", "Cannot get reservation from session")
 		http.Redirect(writer, request, "/", http.StatusTemporaryRedirect)
 		return
