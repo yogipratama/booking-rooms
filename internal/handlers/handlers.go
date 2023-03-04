@@ -6,10 +6,13 @@ import (
 	"net/http"
 
 	"github.com/yogipratama/booking-rooms/internal/config"
+	"github.com/yogipratama/booking-rooms/internal/driver"
 	"github.com/yogipratama/booking-rooms/internal/forms"
 	"github.com/yogipratama/booking-rooms/internal/helpers"
 	"github.com/yogipratama/booking-rooms/internal/models"
 	"github.com/yogipratama/booking-rooms/internal/render"
+	"github.com/yogipratama/booking-rooms/internal/repository"
+	"github.com/yogipratama/booking-rooms/internal/repository/dbrepo"
 )
 
 // Repo the repository used by the handlers
@@ -18,12 +21,14 @@ var Repo *Repository
 // Repository is the repository type
 type Repository struct {
 	App *config.AppConfig
+	DB  repository.DatabaseRepo
 }
 
 // Creates a new Repository
-func NewRepo(app *config.AppConfig) *Repository {
+func NewRepo(app *config.AppConfig, db *driver.DB) *Repository {
 	return &Repository{
 		App: app,
+		DB:  dbrepo.NewPostgresRepo(db.SQL, app),
 	}
 }
 
