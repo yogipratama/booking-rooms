@@ -20,7 +20,7 @@ var pathToTemplates = "./templates"
 var functions = template.FuncMap{}
 
 // sets the config for the template package
-func NewTemplates(app *config.AppConfig) {
+func NewRenderer(app *config.AppConfig) {
 	appConfig = app
 }
 
@@ -32,7 +32,7 @@ func AddDefaultData(tmplData *models.TemplateData, request *http.Request) *model
 	return tmplData
 }
 
-func RenderTmpl(writer http.ResponseWriter, request *http.Request, tmpl string, tmplData *models.TemplateData) error {
+func Template(writer http.ResponseWriter, request *http.Request, tmpl string, tmplData *models.TemplateData) error {
 
 	var tmplCache map[string]*template.Template
 	if appConfig.UseCache {

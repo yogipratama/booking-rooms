@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/yogipratama/booking-rooms/internal/config"
 	"github.com/yogipratama/booking-rooms/internal/driver"
@@ -38,23 +40,23 @@ func NewHandlers(repo *Repository) {
 }
 
 func (repo *Repository) Home(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "home.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "home.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) About(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "about.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "about.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) Generals(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "generals.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "generals.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) Majors(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "majors.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "majors.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) Availability(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "search-availability.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "search-availability.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) PostAvailability(writer http.ResponseWriter, request *http.Request) {
@@ -64,14 +66,14 @@ func (repo *Repository) PostAvailability(writer http.ResponseWriter, request *ht
 }
 
 func (repo *Repository) Contact(writer http.ResponseWriter, request *http.Request) {
-	render.RenderTmpl(writer, request, "contact.page.gohtml", &models.TemplateData{})
+	render.Template(writer, request, "contact.page.gohtml", &models.TemplateData{})
 }
 
 func (repo *Repository) Reservation(writer http.ResponseWriter, request *http.Request) {
 	var emptyReservation models.Reservation
 	data := make(map[string]interface{})
 	data["reservation"] = emptyReservation
-	render.RenderTmpl(writer, request, "make-reservation.page.gohtml", &models.TemplateData{
+	render.Template(writer, request, "make-reservation.page.gohtml", &models.TemplateData{
 		Form: forms.New(nil),
 		Data: data,
 	})
@@ -83,11 +85,36 @@ func (repo *Repository) PostReservation(writer http.ResponseWriter, request *htt
 		helpers.ServerError(writer, err)
 	}
 
+	startDate := request.Form.Get("start_date")
+	endDate := request.Form.Get("end_date")
+
+	// 2020-01-01 - 01/02 03:04:05PM '06 -0700
+	layout := "2006-01-02"
+	strtDate, err := time.Parse(layout, startDate)
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+	enDate, err := time.Parse(layout, endDate)
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+
+	roomID, err := strconv.Atoi(request.Form.Get("room_id"))
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+
 	reservation := models.Reservation{
 		FirstName: request.Form.Get("first_name"),
 		LastName:  request.Form.Get("last_name"),
 		Email:     request.Form.Get("email"),
 		Phone:     request.Form.Get("phone"),
+		StartDate: strtDate,
+		EndDate:   enDate,
+		RoomID:    roomID,
 	}
 
 	form := forms.New(request.PostForm)
@@ -101,12 +128,33 @@ func (repo *Repository) PostReservation(writer http.ResponseWriter, request *htt
 		data := make(map[string]interface{})
 		data["reservation"] = reservation
 
-		render.RenderTmpl(writer, request, "make-reservation.page.gohtml", &models.TemplateData{
+		render.Template(writer, request, "make-reservation.page.gohtml", &models.TemplateData{
 			Form: form,
 			Data: data,
 		})
 		return
 	}
+
+	newReservationID, err := repo.DB.InsertReservation(reservation)
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+
+	restriction := models.RoomRestriction{
+		StartDate:     strtDate,
+		EndDate:       enDate,
+		RoomID:        roomID,
+		ReservationID: newReservationID,
+		RestrictionID: 1,
+	}
+
+	err = repo.DB.InsertRoomRestriction(restriction)
+	if err != nil {
+		helpers.ServerError(writer, err)
+		return
+	}
+
 	repo.App.Session.Put(request.Context(), "reservation", reservation)
 
 	http.Redirect(writer, request, "/reservation-summary", http.StatusSeeOther)
@@ -146,7 +194,7 @@ func (repo *Repository) ReservationSummary(writer http.ResponseWriter, request *
 	data := make(map[string]interface{})
 	data["reservation"] = reservation
 
-	render.RenderTmpl(writer, request, "reservation-summary.page.gohtml", &models.TemplateData{
+	render.Template(writer, request, "reservation-summary.page.gohtml", &models.TemplateData{
 		Data: data,
 	})
 }
